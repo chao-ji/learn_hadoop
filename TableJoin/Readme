@@ -1,0 +1,25 @@
+Natural Join Two Tables
+
+1. Input
+Table: Order (Use 'a' as indicator for Mapper)
+    Customer  ItemID
+a   Smith     1
+a   David     2
+a   Michael   2
+a   David     3
+a   Jim 6
+
+Table: Item (User 'b' as indicator for Mapper)
+    ItemID  ItemName
+b   1       ItemA
+b   2       ItemB
+b   3       ItemC
+b   6       ItemD
+    
+2. Output
+Smith   ItemA
+Michael ItemB
+David   ItemB
+David   ItemC
+Jim ItemD
+
