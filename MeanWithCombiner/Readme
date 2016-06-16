@@ -1,0 +1,26 @@
+Compute average/mean of a set of numbers using Combiner (Different from reducer).
+
+Map:
+  input:
+    key: N/A
+    value: 'num' read from a line of text
+  output:
+    key: "key"
+    value: SumCountTuple (implements Writable) containing 'sum' (e.g. 'num') and 'count' (e.g. 1)
+
+Combine:
+  input:
+    key: "key"
+    value: SumCountTuple (implements Writable) containing 'sum' (e.g. 'num') and 'count' (e.g. 1)
+  output:
+    key: "key"
+    value: SumCountTuple (implements Writable) containing 1) sum over the list of input values; 2) size of the list of input values. 
+
+Reduce:
+  input:
+    key: "key"
+    value: SumCountTuple (implements Writable) containing 1) sum 2) count
+  output:
+    key: "key"
+    value: mean = sum / count, where sum and count are aggregated over the list of values. 
+    
