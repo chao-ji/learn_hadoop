@@ -17,52 +17,33 @@ import org.apache.hadoop.util.GenericOptionsParser;
 
 public class MeanWithCombiner
 {
-	public static class MeanMapper extends Mapper<Object, Text, Text, SumCountTuple>
+	public static class MeanMapper extends Mapper<Object, Text, Text, MeanCountTuple>
 	{
-		private final static IntWritable one = new IntWritable(1);
-
 		public void map(Object key, Text value, Context context) throws IOException, InterruptedException
 		{
-			SumCountTuple tuple = new SumCountTuple();
-			tuple.setSum(Double.parseDouble(value.toString()));
-			tuple.setCount(one.get());
+			MeanCountTuple tuple = new MeanCountTuple();
+			tuple.setMean(Double.parseDouble(value.toString()));
+			tuple.setCount(1);
 			context.write(new Text("key"), tuple);
 		}
 	}
 
-	public static class MeanCombiner extends Reducer<Text, SumCountTuple, Text, SumCountTuple>
+	public static class MeanReducer extends Reducer<Text, MeanCountTuple, Text, MeanCountTuple>
 	{
-		private SumCountTuple tuple = new SumCountTuple();
+		private MeanCountTuple result = new MeanCountTuple();
 
-		public void reduce(Text key, Iterable<SumCountTuple> values, Context context) throws IOException, InterruptedException
+		public void reduce(Text key, Iterable<MeanCountTuple> values, Context context) throws IOException, InterruptedException
 		{
-			double sum = 0.0;
 			int count = 0;
-			for (SumCountTuple val : values)
+			double sum = 0.0;
+			for (MeanCountTuple val : values)
 			{
-				sum += val.getSum();
+				sum += val.getMean() * val.getCount();
 				count += val.getCount();
 			}
-			tuple.setSum(sum);
-			tuple.setCount(count);
-			context.write(key, tuple);
-		}
-	}
-
-	public static class MeanReducer extends Reducer<Text, SumCountTuple, Text, DoubleWritable>
-	{
-		public void reduce(Text key, Iterable<SumCountTuple> values, Context context) throws IOException, InterruptedException
-		{
-			double sum = 0.0;
-			int count = 0;
-			double mean = 0.0;
-			for (SumCountTuple val : values)
-			{
-				sum += val.getSum();
-				count += val.getCount();
-			}
-			mean = sum / count;
-			context.write(key, new DoubleWritable(mean));
+			result.setMean(sum / count);
+			result.setCount(count);
+			context.write(key, result);
 		}
 	}
 
@@ -79,42 +60,44 @@ public class MeanWithCombiner
 		Job job = new Job(conf, "MeanWithCombiner");
 		job.setJarByClass(MeanWithCombiner.class);
 		job.setMapperClass(MeanMapper.class);
-		job.setCombinerClass(MeanCombiner.class);
+		job.setCombinerClass(MeanReducer.class);
 		job.setReducerClass(MeanReducer.class);
 
-		job.setMapOutputKeyClass(Text.class);
-		job.setMapOutputValueClass(SumCountTuple.class);
-
 		job.setOutputKeyClass(Text.class);
-		job.setOutputValueClass(DoubleWritable.class);
+		job.setOutputValueClass(MeanCountTuple.class);
 		FileInputFormat.addInputPath(job, new Path(otherArgs[0]));
 		FileOutputFormat.setOutputPath(job, new Path(otherArgs[1]));
 		System.exit(job.waitForCompletion(true) ? 0 : 1);
 	}
 
-	public static class SumCountTuple implements Writable
+	public static class MeanCountTuple implements Writable
 	{
-		private double sum = 0.0;
+		private double mean = 0.0;
 		private int count = 0;
 
-		public Double getSum() { return sum; }
+		public double getMean() { return mean; }
 
-		public void setSum(Double sum) { this.sum = sum; } 
+		public void setMean(double mean) { this.mean = mean; } 
 
-		public Integer getCount() { return count; }
+		public int getCount() { return count; }
 
-		public void setCount(Integer count) { this.count = count; }
+		public void setCount(int count) { this.count = count; }
 
 		public void readFields(DataInput in) throws IOException
 		{
-			sum = in.readDouble();
+			mean = in.readDouble();
 			count = in.readInt();
 		}
 
 		public void write(DataOutput out) throws IOException
 		{
-			out.writeDouble(sum);
+			out.writeDouble(mean);
 			out.writeInt(count);
+		}
+
+		public String toString()
+		{
+			return Double.toString(mean) + "\t" + Integer.toString(count);
 		}
 	}
 }
