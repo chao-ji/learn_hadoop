@@ -3,16 +3,16 @@ Hadoop implementation of the algorithm for finding the longest palindromic subst
 Input: s (Non-empty string)
 Output: sp (The longest palindromic substring of s)
 
-Mapper1: Given string s of length n, it generates key-value pairs of the form (i, s) where i = 0, 1, ..., n - 1.
-For example:
-  0   s
-  1   s
-  2   s
-  n-1 s
-Each line corresponds to the potential palindromic substrings centered at ith character (when the substring has odd length), or the ith and i+1 th character (when the substring has even length).  
+Job1 (Map-only)
+  Mapper: Given string s of length n, it generates key-value pairs of the form (i, s) where i = 0, 1, ..., n - 1.
+  For example:
+    0   s
+    1   s
+    2   s
+    n-1 s
+  Each line corresponds to the potential palindromic substrings centered at ith character (when the substring has odd length), or the ith and i+1 th character (when the substring has even length).  
   
-Reducer1: Given (key, [val]) pairs, it generates key-values paris (key, val). (The iterable list contains only a single element of val.)
+Job2:
+  Mapper: For each pair (i, s) where i = 0, 1, ..., n - 1, generate ('key', sp1), ('key', sp2). The sp1, sp2, ... are the set of palindromic substrings centered at index i.
 
-Mapper2: For each pair (i, s) where i = 0, 1, ..., n - 1, generate ('key', sp1), ('key', sp2). The sp1, sp2, ... are the set of palindromic substrings centered at index i.
-
-Reducer2: Given (key, [val]) pairs where key = 'key', and [val] contains the palidromic substrings centered at different indices, it outputs the longest one.
+  Reducer: Given (key, [val]) pairs where key = 'key', and [val] contains the palidromic substrings centered at different indices, it outputs the longest one.
