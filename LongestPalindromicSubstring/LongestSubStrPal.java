@@ -22,7 +22,7 @@ public class LongestSubStrPal
 		job1.setOutputKeyClass(IntWritable.class);
 		job1.setOutputValueClass(Text.class);
 		job1.setMapperClass(Mapper1.class);
-		job1.setReducerClass(Reducer1.class);
+		job1.setNumReduceTasks(0);
 
 		FileInputFormat.addInputPath(job1, new Path(input));
 		FileOutputFormat.setOutputPath(job1, new Path(temp));
