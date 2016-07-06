@@ -1,0 +1,4 @@
+r	1	s,v
+t	2	w,u,x
+v	2	r
+x	2	w,u,t,y
