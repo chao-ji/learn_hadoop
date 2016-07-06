@@ -111,27 +111,26 @@ public class BFS
 		}
 	}
 
-	public static class OutputMapper extends Mapper<Object, Text, Text, Text>
+	public static class OutputMapper extends Mapper<Object, Text, IntWritable, Text>
 	{
 		public void map(Object key, Text value, Context context) throws IOException, InterruptedException
 		{
 			String line = value.toString();
 			String[] tsv = line.split("\t");
-			Text node = new Text();
-			Text dist = new Text();
-			node.set(tsv[0]);
-			dist.set(tsv[1]);
+
+			Text node = new Text(tsv[0]);
+			IntWritable dist = new IntWritable(Integer.parseInt(tsv[1]));
 
 			context.write(dist, node);
 		}
 	}
 
-	public static class OutputReducer extends Reducer<Text, Text, Text, Text>
+	public static class OutputReducer extends Reducer<IntWritable, Text, Text, Text>
 	{
-		public void reduce(Text key, Iterable<Text> values, Context context) throws IOException, InterruptedException
+		public void reduce(IntWritable key, Iterable<Text> values, Context context) throws IOException, InterruptedException
 		{
 			for (Text value : values)
-				context.write(new Text(value), new Text(key));
+				context.write(new Text(value), new Text(Integer.toString(key.get())));
 		}
 	}
 
@@ -191,6 +190,10 @@ public class BFS
 		outJob.setMapperClass(OutputMapper.class);
 		outJob.setReducerClass(OutputReducer.class);
 		outJob.setNumReduceTasks(1);
+
+		outJob.setMapOutputKeyClass(IntWritable.class);
+		outJob.setMapOutputValueClass(Text.class);
+
 		outJob.setOutputKeyClass(Text.class);
 		outJob.setOutputValueClass(Text.class);
 		FileInputFormat.addInputPath(outJob, new Path(tempPath1));
