@@ -35,7 +35,7 @@ public class KMeans
 		}
 	}
 
-	public static class AssignCenterMapper extends Mapper<Object, Text, Text, Text>
+	public static class AssignCentroidMapper extends Mapper<Object, Text, Text, Text>
 	{
 		private int size;
 		protected void setup(Context context) throws IOException, InterruptedException
@@ -57,17 +57,17 @@ public class KMeans
 
 		public void reduce(Text key, Iterable<Text> values, Context context) throws IOException, InterruptedException
 		{
-			List<String> centers = new ArrayList<String>();
+			List<String> centroids = new ArrayList<String>();
 			String vector = null;
 			for (Text val : values)
 				if (val.toString().charAt(0) == 'D')
 					vector = val.toString().substring(1);
 				else
-					centers.add(val.toString().substring(1));
+					centroids.add(val.toString().substring(1));
 			
 			String[] tsv1 = vector.split("\t");
 			String id = tsv1[0];
-			String partition = tsv1[1];
+			String dataPartition = tsv1[1];
 			int dim = tsv1.length - 2;
 			double[] list1 = new double[dim];
 			for (int i = 2; i < tsv1.length; i++)
@@ -76,9 +76,10 @@ public class KMeans
 			String index = null;
 			double min = Double.MAX_VALUE;
 
-			for (int i = 0; i < centers.size(); i++)
+			for (int i = 0; i < centroids.size(); i++)
 			{
-				String[] tsv2 = centers.get(i).split("\t");
+				String[] tsv2 = centroids.get(i).split("\t");
+				String centroidID = tsv2[0];
 				double[] list2 = new double[dim];
 				for (int j = 1; j < tsv2.length; j++)
 					list2[j - 1] = Double.parseDouble(tsv2[j]);
@@ -86,12 +87,12 @@ public class KMeans
 				double dist = euclideanDist(list1, list2);
 				if (dist < min)
 				{
-					index = tsv2[0];
+					index = centroidID;
 					min = dist;
 				}
 			}
 
-			if (tsv1[1].equals(index))
+			if (dataPartition.equals(index))
 				context.getCounter(KMEANS_STAT_GROUP, UNCHANGED).increment(1);
 			tsv1[1] = index;
 			context.write(new Text(String.join("\t", tsv1)), NullWritable.get());
@@ -179,17 +180,17 @@ public class KMeans
 		String[] otherArgs = new GenericOptionsParser(conf, args).getRemainingArgs();
 		if (otherArgs.length != 4)
 		{
-			System.err.println("Usage: KMeans <data> <center> <size> <max>");
+			System.err.println("Usage: KMeans <data> <centroid> <size> <max>");
 			System.exit(2);
 		}
 
-		long numUnchanged = Long.MAX_VALUE;
+		long numUnchanged = 0;
 		String data = otherArgs[0];
-		String center = otherArgs[1];
+		String centroid = otherArgs[1];
 
-		String center1 = center + "_1";
+		String centroid1 = centroid + "_1";
 		String data1 = data + "_1";
-		String center2 = center + "_2";
+		String centroid2 = centroid + "_2";
 		String data2 = data + "_2";
 
 		conf.set("size", otherArgs[2]);
@@ -204,13 +205,13 @@ public class KMeans
 		updateJob.setOutputKeyClass(Text.class);
 		updateJob.setOutputValueClass(Text.class);
 		FileInputFormat.addInputPath(updateJob, new Path(data));
-		FileOutputFormat.setOutputPath(updateJob, new Path(center1));
+		FileOutputFormat.setOutputPath(updateJob, new Path(centroid1));
 		updateJob.waitForCompletion(true);
 	
 		Job assignJob = Job.getInstance(conf, "KMeans Assignment");
 		assignJob.setJarByClass(KMeans.class);
 		MultipleInputs.addInputPath(assignJob, new Path(data), TextInputFormat.class, AssignDataMapper.class);
-		MultipleInputs.addInputPath(assignJob, new Path(center1), TextInputFormat.class, AssignCenterMapper.class);
+		MultipleInputs.addInputPath(assignJob, new Path(centroid1), TextInputFormat.class, AssignCentroidMapper.class);
 		assignJob.setReducerClass(AssignReducer.class);
 		assignJob.setNumReduceTasks(1);
 		assignJob.setOutputFormatClass(TextOutputFormat.class);
@@ -221,7 +222,7 @@ public class KMeans
 		assignJob.setOutputValueClass(NullWritable.class);
 		assignJob.waitForCompletion(true);
 
-		for (int i = 0; i < max && numUnchanged != 0; i++)
+		for (int i = 0; i < max && numUnchanged < Integer.parseInt(otherArgs[2]); i++)
 		{
 			updateJob = Job.getInstance(conf, "KMeans Update");
 			updateJob.setJarByClass(KMeans.class);
@@ -232,13 +233,13 @@ public class KMeans
 			updateJob.setOutputKeyClass(Text.class);
 			updateJob.setOutputValueClass(Text.class);
 			FileInputFormat.addInputPath(updateJob, new Path(data1));
-			FileOutputFormat.setOutputPath(updateJob, new Path(center2));
+			FileOutputFormat.setOutputPath(updateJob, new Path(centroid2));
 			updateJob.waitForCompletion(true);
 
 			assignJob = Job.getInstance(conf, "KMeans Assignment");
 			assignJob.setJarByClass(KMeans.class);
 			MultipleInputs.addInputPath(assignJob, new Path(data1), TextInputFormat.class, AssignDataMapper.class);
-			MultipleInputs.addInputPath(assignJob, new Path(center2), TextInputFormat.class, AssignCenterMapper.class);
+			MultipleInputs.addInputPath(assignJob, new Path(centroid2), TextInputFormat.class, AssignCentroidMapper.class);
 			assignJob.setReducerClass(AssignReducer.class);
 			assignJob.setNumReduceTasks(1);
 			assignJob.setOutputFormatClass(TextOutputFormat.class);
@@ -250,17 +251,17 @@ public class KMeans
 			assignJob.waitForCompletion(true);
 
 			FileSystem.get(conf).delete(new Path(data1), true);
-			FileSystem.get(conf).delete(new Path(center1), true);
+			FileSystem.get(conf).delete(new Path(centroid1), true);
 
-			numUnchanged = assignJob.getCounters().findCounter("Kmeans", "unchanged").getValue(); 
+			numUnchanged = assignJob.getCounters().findCounter("KMeans", "unchanged").getValue(); 
 
 			String temp = new String(data1);
 			data1 = data2;
 			data2 = temp;
 
-			temp = new String(center1);
-			center1 = center2;
-			center2 = temp;
+			temp = new String(centroid1);
+			centroid1 = centroid2;
+			centroid2 = temp;
 		}
 	}
 
